@@ -1,9 +1,5 @@
 # devsecops-class-boto3-automation
 
-## Pre-reqs
-
-- Configure SNS topic before you test anything
-
 ## Steps to deploy
 
 ```
@@ -18,10 +14,8 @@ terraform plan
 terraform apply -auto-approve
 ```
 
-## Detective Control
+## Lambda will invoke based on the schedule
 
-![Image Description](Detective-Control.jpg) <br>
+![Image Description](schedule-event.jpg) <br>
 
-## Preventive Control
 
-![Image Description](Preventive-Control.jpg) <br>
