@@ -1,0 +1,112 @@
+# IAM Role
+resource "aws_iam_role" "iam_for_lambda" {
+  name = var.iam_role_name
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
+  tags               = var.tags
+}
+
+# IAM policy document
+data "aws_iam_policy_document" "policy" {
+  statement {
+    sid       = "CreateLogGroup"
+    effect    = "Allow"
+    actions   = ["logs:CreateLogGroup"]
+    resources = ["arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*"]
+  }
+
+  statement {
+    sid       = "CreateAndPutLogs"
+    effect    = "Allow"
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.lambda_function_name}:*"]
+  }
+
+  statement {
+    sid       = "Ec2Stop"
+    effect    = "Allow"
+    actions   = ["ec2:*"]
+    resources = ["*"]
+  }
+
+}
+
+# IAM policy
+resource "aws_iam_policy" "lambda_iam_role_policy" {
+  name        = var.iam_policy_name
+  description = var.iam_policy_description
+  policy      = data.aws_iam_policy_document.policy.json
+  tags        = var.tags
+}
+
+# IAM policy attachment to role
+resource "aws_iam_policy_attachment" "lambda_iam_role_policy-attach" {
+  name       = "lambda_ec2stop_policy_attach"
+  roles      = [aws_iam_role.iam_for_lambda.name]
+  policy_arn = aws_iam_policy.lambda_iam_role_policy.arn
+}
+
+# Zip the lambda function
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_file = var.lambda_source_file
+  output_path = var.lambda_zip
+}
+
+# Lambda function
+resource "aws_lambda_function" "lambda_function" {
+  filename         = data.archive_file.lambda_zip.output_path
+  function_name    = var.lambda_function_name
+  role             = aws_iam_role.iam_for_lambda.arn
+  handler          = var.lambda_function_handler
+  runtime          = var.lambda_function_runtime
+  timeout          = var.lambda_function_timeout
+  source_code_hash = base64sha256(var.lambda_zip)
+  tags             = var.tags
+}
+
+# CloudWatch event rule
+resource "aws_cloudwatch_event_rule" "event_rule" {
+  name                = var.event_rule_name
+  description         = var.event_rule_description
+  schedule_expression = "cron(0 20 * * ? *)" ### https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-rule-schedule.html#eb-cron-expressions
+  tags                = var.tags
+  depends_on          = [aws_lambda_function.lambda_function]
+}
+
+# CloudWatch event target
+resource "aws_cloudwatch_event_target" "event_target" {
+  rule      = aws_cloudwatch_event_rule.event_rule.name
+  target_id = var.lambda_function_name
+  arn       = aws_lambda_function.lambda_function.arn
+}
+
+# Lambda permission
+resource "aws_lambda_permission" "allow_cloudwatch_to_call_scheduler" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.lambda_function.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.event_rule.arn
+}
+
+# CloudWatch log group
+resource "aws_cloudwatch_log_group" "cw-log-group" {
+  name              = "/aws/lambda/${var.lambda_function_name}"
+  retention_in_days = 30
+  tags              = var.tags
+}

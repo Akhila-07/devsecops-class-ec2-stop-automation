@@ -1,0 +1,17 @@
+region                  = "us-east-1"
+lambda_source_file      = "lambda/ec2-stop-cost-saving.py"
+lambda_zip              = "lambda/ec2-stop-cost-saving.zip"
+lambda_function_name    = "ec2-stop-cost-saving"
+lambda_function_handler = "ec2-stop-cost-saving.lambda_handler"
+lambda_function_runtime = "python3.9"
+lambda_function_timeout = "300"
+event_rule_name         = "ec2-stop-cost-saving"
+event_rule_description  = "Stopping EC2 after hours to save the cost"
+iam_role_name           = "lambda-role-ec2-stop"
+iam_policy_name         = "lambda-policy-ec2-stop"
+iam_policy_description  = "Lambda policy for ec2 stop"
+tags = {
+  owner       = "DevOps Team"
+  cost-center = "xyz-123-b"
+  automation  = "terraform"
+}
