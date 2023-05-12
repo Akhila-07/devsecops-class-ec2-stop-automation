@@ -1,4 +1,4 @@
-# devsecops-class-boto3-automation
+# devsecops-class-serverelss-ec2-stop-automation
 
 ## Steps to deploy
 
